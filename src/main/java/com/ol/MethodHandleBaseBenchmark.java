@@ -48,54 +48,67 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 @State(Scope.Benchmark)
-public class MethodHandleBenchmark {
+public class MethodHandleBaseBenchmark {
 
-    MyObject object;
-    MethodHandles.Lookup lookup;
-    MethodType methodType;
-    MethodHandle methodHandle;
-    Method reflectionMethod;
+    TestObject object;
+
+    MethodHandle methodHandlePublic;
+
+    Method reflectionMethodPublic;
+
+    MethodHandle methodHandlePrivate;
+
+    Method reflectionMethodPrivate;
 
     @Setup
     public void prepare() throws NoSuchMethodException, IllegalAccessException {
-        object = new MyObject();
-        lookup = MethodHandles.lookup();
-        methodType = MethodType.methodType(void.class, String.class);
-        methodHandle = lookup.findVirtual(MyObject.class, "doSomething", methodType);
+        object = new TestObject();
+        MethodHandles.Lookup lookup = MethodHandles.lookup();
+        MethodType methodType = MethodType.methodType(void.class, String.class);
 
-        reflectionMethod = MyObject.class.getMethod("doSomething", String.class);
+        reflectionMethodPublic = TestObject.class.getMethod("doSomethingPublic", String.class);
+        methodHandlePublic = lookup.findVirtual(TestObject.class, "doSomethingPublic", methodType);
+
+        reflectionMethodPrivate = TestObject.class.getDeclaredMethod("doSomethingPrivate", String.class);
+        reflectionMethodPrivate.setAccessible(true);
+        methodHandlePrivate = lookup.unreflect(reflectionMethodPrivate);
     }
 
     @Benchmark
-    public void useInvokeDynamic() throws Throwable {
-        methodHandle.invoke(object, "str");
+    public void useInvokeDynamicPublic() throws Throwable {
+        methodHandlePublic.invoke(object, "str");
     }
 
     @Benchmark
-    public void useInvoke() {
-        object.doSomething("str");
+    public void useInvokePublic() {
+        object.doSomethingPublic("str");
     }
 
     @Benchmark
-    public void useReflection() throws InvocationTargetException, IllegalAccessException {
-        reflectionMethod.invoke(object, "str");
+    public void useReflectionPublic() throws InvocationTargetException, IllegalAccessException {
+        reflectionMethodPublic.invoke(object, "str");
+    }
+
+    @Benchmark
+    public void useInvokeDynamicPrivate() throws Throwable {
+        methodHandlePrivate.invoke(object, "str");
+    }
+
+    @Benchmark
+    public void useReflectionPrivate() throws InvocationTargetException, IllegalAccessException {
+        reflectionMethodPrivate.invoke(object, "str");
     }
 
 
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
-                .include(MethodHandleBenchmark.class.getSimpleName())
+                .include(MethodHandleBaseBenchmark.class.getSimpleName())
                 .warmupIterations(5)
-                .measurementIterations(5)
+                .measurementIterations(7)
                 .forks(1)
                 .build();
 
         new Runner(opt).run();
     }
 
-    private static class MyObject {
-        public void doSomething(String s) {
-            Blackhole.consumeCPU(3);
-        }
-    }
 }
